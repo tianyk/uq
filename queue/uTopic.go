@@ -13,6 +13,9 @@ import (
 )
 
 func init() {
+	// gob包管理gob流——在编码器（发送器）和解码器（接受器）之间交换的binary值.
+	// 一般用于传递远端程序调用（RPC）的参数和结果，如net/rpc包就有提供。
+	// Register记录value下层具体值的类型和其名称。
 	gob.Register(&topicStore{})
 }
 
@@ -111,6 +114,9 @@ func (t *topic) genTopicStore() *topicStore {
 func (t *topic) exportTopic() error {
 	topicStoreValue := t.genTopicStore()
 
+	// bytes包实现了操作[]byte的常用函数.
+	// http://studygolang.com/static/pkgdoc/pkg/bytes.htm#NewBuffer
+	// NewBuffer使用buf作为初始内容创建并初始化一个Buffer。
 	buffer := bytes.NewBuffer(nil)
 	enc := gob.NewEncoder(buffer)
 	err := enc.Encode(topicStoreValue)

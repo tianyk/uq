@@ -18,6 +18,7 @@ func NewLevelStore(path string) (*LevelStore, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	ls := new(LevelStore)
 	ls.path = path
 	ls.db = db

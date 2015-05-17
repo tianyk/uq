@@ -51,6 +51,7 @@ type unitedQueueStore struct {
 }
 
 func NewUnitedQueue(storage store.Storage, ip string, port int, etcdServers []string, etcdKey string) (*UnitedQueue, error) {
+	// 主题 uTopic.topic
 	topics := make(map[string]*topic)
 	etcdStop := make(chan bool)
 	uq := new(UnitedQueue)

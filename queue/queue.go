@@ -1,5 +1,6 @@
 package queue
 
+// 定义消息队列接口
 type MessageQueue interface {
 	// queue functions
 	Push(key string, data []byte) error
@@ -8,6 +9,7 @@ type MessageQueue interface {
 	MultiPop(key string, n int) ([]string, [][]byte, error)
 	Confirm(key string) error
 	MultiConfirm(keys []string) []error
+
 	// admin functions
 	Create(key, recycle string) error
 	Empty(key string) error
