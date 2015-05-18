@@ -22,9 +22,9 @@ func init() {
 
 const (
 	StorageKeyWord   string        = "UnitedQueueKey"
-	BgBackupInterval time.Duration = 10 * time.Second
-	BgCleanInterval  time.Duration = 20 * time.Second
-	BgCleanTimeout   time.Duration = 5 * time.Second
+	BgBackupInterval time.Duration = 10 * time.Second // 备份间隔
+	BgCleanInterval  time.Duration = 20 * time.Second // 清理间隔
+	BgCleanTimeout   time.Duration = 5 * time.Second  // 清理超时
 	KeyTopicStore    string        = ":store"
 	KeyTopicHead     string        = ":head"
 	KeyTopicTail     string        = ":tail"
@@ -59,6 +59,7 @@ func NewUnitedQueue(storage store.Storage, ip string, port int, etcdServers []st
 	uq.storage = storage
 	uq.etcdStop = etcdStop
 
+	// 启动etcdServer
 	if len(etcdServers) > 0 {
 		selfAddr := Addrcat(ip, port)
 		uq.selfAddr = selfAddr

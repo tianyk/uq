@@ -182,6 +182,7 @@ func main() {
 		return
 	}
 
+	// 对外API 对外可以提供HTTP、Memcache、redis接口形式的API
 	var entrance entry.Entrance
 	if protocol == "http" {
 		entrance, err = entry.NewHttpEntry(host, port, messageQueue)
@@ -199,10 +200,19 @@ func main() {
 		return
 	}
 
+	// Signal代表一个操作系统信号 在Unix中，它是syscall.Signal类型。
+	// http://studygolang.com/static/pkgdoc/pkg/os.htm#Signal
 	stop := make(chan os.Signal)
 	entryFailed := make(chan bool)
-	adminFailed := make(chan bool)
+	adminFailed := make(chan bool)、
+	// http://tonybai.com/2012/09/21/signal-handling-in-go/
+	// 该函数会将进程收到的系统Signal转发给channel c
+	// 需要在Notify中传入你要关注和处理的Signal类型，也就是拦截它们，提供自定义处理函数来改变它们的行为。
 	signal.Notify(stop, syscall.SIGINT, os.Interrupt, os.Kill)
+
+	// http://studygolang.com/static/pkgdoc/pkg/sync.htm#WaitGroup
+	// WaitGroup用于等待一组线程的结束。父线程调用Add方法来设定应等待的线程的数量。
+	// 每个被等待的线程在结束时应调用Done方法。同时，主线程里可以调用Wait方法阻塞至所有线程结束。
 	var wg sync.WaitGroup
 
 	// start entrance server
