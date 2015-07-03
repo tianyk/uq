@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// 继承自net.TCPListener
 type StopListener struct {
 	*net.TCPListener          //Wrapped listener // 继承net.TCPListener
 	stop             chan int //Channel used only to indicate listener should shutdown

@@ -175,6 +175,8 @@ func main() {
 	// 	storage.Close()
 	// 	return
 	// }
+	// messageQueue内部包含一个存储实现
+	// 每个API Server包含一个messageQueue
 	messageQueue, err = queue.NewUnitedQueue(storage, ip, port, etcdServers, cluster)
 	if err != nil {
 		fmt.Printf("queue init error: %s\n", err)
@@ -204,7 +206,7 @@ func main() {
 	// http://studygolang.com/static/pkgdoc/pkg/os.htm#Signal
 	stop := make(chan os.Signal)
 	entryFailed := make(chan bool)
-	adminFailed := make(chan bool)、
+	adminFailed := make(chan bool)
 	// http://tonybai.com/2012/09/21/signal-handling-in-go/
 	// 该函数会将进程收到的系统Signal转发给channel c
 	// 需要在Notify中传入你要关注和处理的Signal类型，也就是拦截它们，提供自定义处理函数来改变它们的行为。
@@ -249,6 +251,7 @@ func main() {
 		}
 	}(adminFailed)
 
+	// 不是http RESTful服务
 	// start pprof server
 	go func() {
 		addr := Addrcat(host, pprofPort)

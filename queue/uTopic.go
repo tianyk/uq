@@ -35,6 +35,7 @@ type topic struct {
 	wg   sync.WaitGroup
 }
 
+// 存储的topic中所有的line
 type topicStore struct {
 	Lines []string
 }
