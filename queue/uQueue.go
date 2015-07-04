@@ -118,6 +118,9 @@ func (u *UnitedQueue) delData(key string) error {
 	return nil
 }
 
+/**
+ * Quere.topics持久化，topic.line持久化
+ */
 func (u *UnitedQueue) exportTopics() error {
 	u.topicsLock.RLock()
 	defer u.topicsLock.RUnlock()
@@ -277,6 +280,11 @@ func (u *UnitedQueue) loadQueue() error {
 	return nil
 }
 
+/**
+ * 创建一个topic
+ * @param  {[type]} u *UnitedQueue) newTopic(name string) (*topic, error [description]
+ * @return {[type]}   [description]
+ */
 func (u *UnitedQueue) newTopic(name string) (*topic, error) {
 	lines := make(map[string]*line)
 	t := new(topic)
@@ -322,6 +330,7 @@ func (u *UnitedQueue) createTopic(name string, fromEtcd bool) error {
 	defer u.topicsLock.Unlock()
 	u.topics[name] = t
 
+	// 数据立马落地存储
 	err = u.exportQueue()
 	if err != nil {
 		t.remove()
@@ -336,6 +345,11 @@ func (u *UnitedQueue) createTopic(name string, fromEtcd bool) error {
 	return nil
 }
 
+/**
+ * create topic/line
+ * topic/line key
+ * rec 确认
+ */
 func (u *UnitedQueue) create(key, rec string, fromEtcd bool) error {
 	key = strings.TrimPrefix(key, "/")
 	key = strings.TrimSuffix(key, "/")
@@ -397,10 +411,16 @@ func (u *UnitedQueue) create(key, rec string, fromEtcd bool) error {
 	return err
 }
 
+/**
+ *
+ */
 func (u *UnitedQueue) Create(key, rec string) error {
 	return u.create(key, rec, false)
 }
 
+/**
+ * push 数据到topic
+ */
 func (u *UnitedQueue) Push(key string, data []byte) error {
 	key = strings.TrimPrefix(key, "/")
 	key = strings.TrimSuffix(key, "/")
@@ -425,6 +445,9 @@ func (u *UnitedQueue) Push(key string, data []byte) error {
 	return t.push(data)
 }
 
+/**
+ * 一次push多个数据
+ */
 func (u *UnitedQueue) MultiPush(key string, datas [][]byte) error {
 	key = strings.TrimPrefix(key, "/")
 	key = strings.TrimSuffix(key, "/")
@@ -452,6 +475,12 @@ func (u *UnitedQueue) MultiPush(key string, datas [][]byte) error {
 	return t.mPush(datas)
 }
 
+/**
+ * pop topic/line
+ * 调用topic.pop，接着调用line.pop
+ * @param  {[type]} u *UnitedQueue) Pop(key string) (string, []byte, error [description]
+ * @return {[type]}   [description]
+ */
 func (u *UnitedQueue) Pop(key string) (string, []byte, error) {
 	key = strings.TrimPrefix(key, "/")
 	key = strings.TrimSuffix(key, "/")
@@ -464,8 +493,8 @@ func (u *UnitedQueue) Pop(key string) (string, []byte, error) {
 		)
 	}
 
-	tName := parts[0]
-	lName := parts[1]
+	tName := parts[0] // topic name
+	lName := parts[1] // line name
 
 	u.topicsLock.RLock()
 	t, ok := u.topics[tName]

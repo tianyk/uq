@@ -51,6 +51,9 @@ func (l *line) removeRecycleData() error {
 	return nil
 }
 
+/**
+ * 将line里面所有的message记录
+ */
 func (l *line) genLineStore() *lineStore {
 	inflights := make([]inflightMessage, l.inflight.Len())
 	i := 0
@@ -89,6 +92,9 @@ func (l *line) exportLine() error {
 	return nil
 }
 
+/**
+ * 删除line里面的数据
+ */
 func (l *line) removeLineData() error {
 	lineStoreKey := l.t.name + "/" + l.name
 	err := l.t.q.delData(lineStoreKey)
@@ -117,16 +123,27 @@ func (l *line) updateiHead() {
 	}
 }
 
+/**
+ * 先从inflight列表中取，如果取到，重新修改其过期时间，再把它放置到inflight中。
+ * 如果未取到，从取出一个最新的，然后将其放置到inflight中
+ * @param  {[type]} l *line)        pop() (uint64, []byte, error [description]
+ * @return {[type]}   [description]
+ */
 func (l *line) pop() (uint64, []byte, error) {
 	l.inflightLock.Lock()
 	defer l.inflightLock.Unlock()
 
 	now := time.Now()
+	// 先从未确认列表中取，取到如果已经过期，则返回此值
 	if l.recycle > 0 {
-
+		// http://studygolang.com/static/pkgdoc/pkg/container_list.htm#List.Front
+		// Front返回链表第一个元素或nil。
 		m := l.inflight.Front()
 		if m != nil {
+			// m.Value节点存储的数据
 			msg := m.Value.(*inflightMessage)
+
+			// 过期还未响应
 			if now.After(msg.Exptime) {
 				// log.Printf("key[%s/%d] is expired.", l.name, msg.Tid)
 				msg.Exptime = now.Add(l.recycle)
@@ -134,7 +151,9 @@ func (l *line) pop() (uint64, []byte, error) {
 				if err != nil {
 					return 0, nil, err
 				}
+				// Remove删除链表中的元素e，并返回e.Value。
 				l.inflight.Remove(m)
+				// PushBack将一个值为v的新元素插入链表的最后一个位置，返回生成的新元素。
 				l.inflight.PushBack(msg)
 				// log.Printf("key[%s/%s/%d] poped.", l.t.name, l.name, msg.Tid)
 				return msg.Tid, data, nil
@@ -144,7 +163,7 @@ func (l *line) pop() (uint64, []byte, error) {
 
 	l.headLock.Lock()
 	defer l.headLock.Unlock()
-	tid := l.head
+	tid := l.head // 头文件ID
 
 	topicTail := l.t.getTail()
 	if l.head >= topicTail {
@@ -162,6 +181,7 @@ func (l *line) pop() (uint64, []byte, error) {
 
 	l.head++
 
+	// 放置到确认队列中去，没有正确处理完成响应，数据从入队
 	if l.recycle > 0 {
 		msg := new(inflightMessage)
 		msg.Tid = tid
@@ -253,6 +273,9 @@ func (l *line) mPop(n int) ([]uint64, [][]byte, error) {
 	)
 }
 
+/**
+ * 确认机制，确认处理完成。配合recycle
+ */
 func (l *line) confirm(id uint64) error {
 	if l.recycle == 0 {
 		return NewError(
@@ -291,6 +314,9 @@ func (l *line) confirm(id uint64) error {
 	)
 }
 
+/**
+ * 获得line状态
+ */
 func (l *line) stat() *QueueStat {
 	l.inflightLock.RLock()
 	defer l.inflightLock.RUnlock()
@@ -310,6 +336,9 @@ func (l *line) stat() *QueueStat {
 	return qs
 }
 
+/**
+ * 清空不代表删除数据，只是将head设置为topic的head
+ */
 func (l *line) empty() error {
 	l.inflightLock.Lock()
 	defer l.inflightLock.Unlock()
