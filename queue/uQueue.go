@@ -35,9 +35,10 @@ const (
 )
 
 type UnitedQueue struct {
-	topics     map[string]*topic
+	topics     map[string]*topic // 包含一个主题集合
 	topicsLock sync.RWMutex
-	storage    store.Storage
+	storage    store.Storage // 包含一个存储实现
+	// etcd 相关
 	etcdLock   sync.RWMutex
 	selfAddr   string
 	etcdClient *etcd.Client
@@ -46,6 +47,7 @@ type UnitedQueue struct {
 	wg         sync.WaitGroup
 }
 
+// topic列表
 type unitedQueueStore struct {
 	Topics []string
 }
@@ -77,6 +79,7 @@ func NewUnitedQueue(storage store.Storage, ip string, port int, etcdServers []st
 	return uq, nil
 }
 
+// set k/v
 func (u *UnitedQueue) setData(key string, data []byte) error {
 	err := u.storage.Set(key, data)
 	if err != nil {
@@ -89,6 +92,7 @@ func (u *UnitedQueue) setData(key string, data []byte) error {
 	return nil
 }
 
+// get k
 func (u *UnitedQueue) getData(key string) ([]byte, error) {
 	data, err := u.storage.Get(key)
 	if err != nil {
@@ -101,6 +105,7 @@ func (u *UnitedQueue) getData(key string) ([]byte, error) {
 	return data, nil
 }
 
+// delete k
 func (u *UnitedQueue) delData(key string) error {
 	err := u.storage.Del(key)
 	if err != nil {
@@ -113,6 +118,9 @@ func (u *UnitedQueue) delData(key string) error {
 	return nil
 }
 
+/**
+ * Quere.topics持久化，topic.line持久化
+ */
 func (u *UnitedQueue) exportTopics() error {
 	u.topicsLock.RLock()
 	defer u.topicsLock.RUnlock()
@@ -136,6 +144,7 @@ func (u *UnitedQueue) exportTopics() error {
 	return nil
 }
 
+// 赋值出来UnitedQueue中的所有topics组成一个列表，放置到unitedQueueStore中
 func (u *UnitedQueue) genQueueStore() *unitedQueueStore {
 	topics := make([]string, len(u.topics))
 	i := 0
@@ -149,6 +158,8 @@ func (u *UnitedQueue) genQueueStore() *unitedQueueStore {
 	return qs
 }
 
+// 将所有的topic持久化到storage中
+// 服务器重新启动时需要加载数据时就从中
 func (u *UnitedQueue) exportQueue() error {
 	// log.Printf("start export queue...")
 
@@ -170,18 +181,22 @@ func (u *UnitedQueue) exportQueue() error {
 	return nil
 }
 
+// 加载出来topic的信息，topicStore包含着一个line列表
 func (u *UnitedQueue) loadTopic(topicName string, topicStoreValue topicStore) (*topic, error) {
 	t := new(topic)
 	t.name = topicName
 	t.q = u
 	t.quit = make(chan bool)
 
+	// 头
 	t.headKey = topicName + KeyTopicHead
 	topicHeadData, err := u.getData(t.headKey)
 	if err != nil {
 		return nil, err
 	}
 	t.head = binary.LittleEndian.Uint64(topicHeadData)
+
+	// 尾
 	t.tailKey = topicName + KeyTopicTail
 	topicTailData, err := u.getData(t.tailKey)
 	if err != nil {
@@ -191,6 +206,7 @@ func (u *UnitedQueue) loadTopic(topicName string, topicStoreValue topicStore) (*
 
 	lines := make(map[string]*line)
 	for _, lineName := range topicStoreValue.Lines {
+		// 每条line一个store key
 		lineStoreKey := topicName + "/" + lineName
 		lineStoreData, err := u.getData(lineStoreKey)
 		if err != nil {
@@ -202,6 +218,7 @@ func (u *UnitedQueue) loadTopic(topicName string, topicStoreValue topicStore) (*
 		var lineStoreValue lineStore
 		dec3 := gob.NewDecoder(bytes.NewBuffer(lineStoreData))
 		if e := dec3.Decode(&lineStoreValue); e == nil {
+			// 加载line的信息
 			l, err := t.loadLine(lineName, lineStoreValue)
 			if err != nil {
 				continue
@@ -220,7 +237,9 @@ func (u *UnitedQueue) loadTopic(topicName string, topicStoreValue topicStore) (*
 	return t, nil
 }
 
+// 加载queue中的所有的topic，加载topic时加载每个topic的line
 func (u *UnitedQueue) loadQueue() error {
+	// 对应exportQueue，将持久化到store中的topic全部load出来
 	unitedQueueStoreData, err := u.getData(StorageKeyWord)
 	if err != nil {
 		// log.Printf("storage not existed: %s", err)
@@ -229,9 +248,11 @@ func (u *UnitedQueue) loadQueue() error {
 
 	if len(unitedQueueStoreData) > 0 {
 		var unitedQueueStoreValue unitedQueueStore
+		// 反序列化
 		dec := gob.NewDecoder(bytes.NewBuffer(unitedQueueStoreData))
 		if e := dec.Decode(&unitedQueueStoreValue); e == nil {
 			for _, topicName := range unitedQueueStoreValue.Topics {
+				// 遍历所有的topic
 				topicStoreData, err := u.getData(topicName)
 				if err != nil {
 					return err
@@ -259,6 +280,11 @@ func (u *UnitedQueue) loadQueue() error {
 	return nil
 }
 
+/**
+ * 创建一个topic
+ * @param  {[type]} u *UnitedQueue) newTopic(name string) (*topic, error [description]
+ * @return {[type]}   [description]
+ */
 func (u *UnitedQueue) newTopic(name string) (*topic, error) {
 	lines := make(map[string]*line)
 	t := new(topic)
@@ -304,6 +330,7 @@ func (u *UnitedQueue) createTopic(name string, fromEtcd bool) error {
 	defer u.topicsLock.Unlock()
 	u.topics[name] = t
 
+	// 数据立马落地存储
 	err = u.exportQueue()
 	if err != nil {
 		t.remove()
@@ -318,6 +345,11 @@ func (u *UnitedQueue) createTopic(name string, fromEtcd bool) error {
 	return nil
 }
 
+/**
+ * create topic/line
+ * topic/line key
+ * rec 确认
+ */
 func (u *UnitedQueue) create(key, rec string, fromEtcd bool) error {
 	key = strings.TrimPrefix(key, "/")
 	key = strings.TrimSuffix(key, "/")
@@ -379,10 +411,16 @@ func (u *UnitedQueue) create(key, rec string, fromEtcd bool) error {
 	return err
 }
 
+/**
+ *
+ */
 func (u *UnitedQueue) Create(key, rec string) error {
 	return u.create(key, rec, false)
 }
 
+/**
+ * push 数据到topic
+ */
 func (u *UnitedQueue) Push(key string, data []byte) error {
 	key = strings.TrimPrefix(key, "/")
 	key = strings.TrimSuffix(key, "/")
@@ -407,6 +445,9 @@ func (u *UnitedQueue) Push(key string, data []byte) error {
 	return t.push(data)
 }
 
+/**
+ * 一次push多个数据
+ */
 func (u *UnitedQueue) MultiPush(key string, datas [][]byte) error {
 	key = strings.TrimPrefix(key, "/")
 	key = strings.TrimSuffix(key, "/")
@@ -434,6 +475,12 @@ func (u *UnitedQueue) MultiPush(key string, datas [][]byte) error {
 	return t.mPush(datas)
 }
 
+/**
+ * pop topic/line
+ * 调用topic.pop，接着调用line.pop
+ * @param  {[type]} u *UnitedQueue) Pop(key string) (string, []byte, error [description]
+ * @return {[type]}   [description]
+ */
 func (u *UnitedQueue) Pop(key string) (string, []byte, error) {
 	key = strings.TrimPrefix(key, "/")
 	key = strings.TrimSuffix(key, "/")
@@ -446,8 +493,8 @@ func (u *UnitedQueue) Pop(key string) (string, []byte, error) {
 		)
 	}
 
-	tName := parts[0]
-	lName := parts[1]
+	tName := parts[0] // topic name
+	lName := parts[1] // line name
 
 	u.topicsLock.RLock()
 	t, ok := u.topics[tName]

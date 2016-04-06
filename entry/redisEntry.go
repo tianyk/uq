@@ -123,6 +123,7 @@ func (r *RedisEntry) handlerConn(session *Session) {
 
 func (r *RedisEntry) ListenAndServe() error {
 	addr := Addrcat(r.host, r.port)
+	// tcp 协议
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err

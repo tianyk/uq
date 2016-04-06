@@ -23,10 +23,10 @@ type topic struct {
 	name      string
 	lines     map[string]*line
 	linesLock sync.RWMutex
-	head      uint64
+	head      uint64 // 头
 	headLock  sync.RWMutex
 	headKey   string
-	tail      uint64
+	tail      uint64 // 尾
 	tailLock  sync.RWMutex
 	tailKey   string
 	q         *UnitedQueue
@@ -35,10 +35,16 @@ type topic struct {
 	wg   sync.WaitGroup
 }
 
+// 存储的topic中所有的line
 type topicStore struct {
 	Lines []string
 }
 
+/**
+ * 还是从Queue中store中获取
+ * @param  {[type]} t *topic)       getData(id uint64) ([]byte, error [description]
+ * @return {[type]}   [description]
+ */
 func (t *topic) getData(id uint64) ([]byte, error) {
 	key := Acatui(t.name, ":", id)
 	return t.q.getData(key)
@@ -61,6 +67,9 @@ func (t *topic) getTail() uint64 {
 	return t.tail
 }
 
+/**
+ * 将topicHead持久化
+ */
 func (t *topic) exportHead() error {
 	topicHeadData := make([]byte, 8)
 	binary.LittleEndian.PutUint64(topicHeadData, t.head)
@@ -79,6 +88,9 @@ func (t *topic) removeHeadData() error {
 	return nil
 }
 
+/**
+ * 讲topicTail持久化
+ */
 func (t *topic) exportTail() error {
 	topicTailData := make([]byte, 8)
 	binary.LittleEndian.PutUint64(topicTailData, t.tail)
@@ -97,6 +109,9 @@ func (t *topic) removeTailData() error {
 	return nil
 }
 
+/**
+ * 列出topic中所有的line
+ */
 func (t *topic) genTopicStore() *topicStore {
 	lines := make([]string, len(t.lines))
 	i := 0
@@ -144,6 +159,9 @@ func (t *topic) removeTopicData() error {
 	return nil
 }
 
+/**
+ * topic.lenes持久化
+ */
 func (t *topic) exportLines() error {
 	t.linesLock.RLock()
 	defer t.linesLock.RUnlock()
@@ -322,10 +340,12 @@ func (t *topic) newLine(name string, recycle time.Duration) (*line, error) {
 	l.imap = imap
 	l.t = t
 
+	// 持久化line
 	err := l.exportLine()
 	if err != nil {
 		return nil, err
 	}
+	// 持久化确认机制
 	err = l.exportRecycle()
 	if err != nil {
 		return nil, err
@@ -334,6 +354,10 @@ func (t *topic) newLine(name string, recycle time.Duration) (*line, error) {
 	return l, nil
 }
 
+/**
+ * new Line
+ * 持久化line
+ */
 func (t *topic) createLine(name string, recycle time.Duration, fromEtcd bool) error {
 	t.linesLock.Lock()
 	defer t.linesLock.Unlock()
@@ -372,6 +396,7 @@ func (t *topic) push(data []byte) error {
 	t.tailLock.Lock()
 	defer t.tailLock.Unlock()
 
+	// key为topic.name + ':' + t.tail (计数器，每次递增)
 	key := Acatui(t.name, ":", t.tail)
 	err := t.q.setData(key, data)
 	if err != nil {
