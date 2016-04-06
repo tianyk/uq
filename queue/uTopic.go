@@ -277,8 +277,11 @@ func (t *topic) backgroundClean() {
 	defer t.wg.Done()
 
 	bgQuit := false
-	backupTick := time.NewTicker(BgBackupInterval)
-	cleanTick := time.NewTicker(BgCleanInterval)
+	// NewTicker返回一个新的Ticker，该Ticker包含一个通道字段，并会每隔时间段d就向该通道发送当时的时间。
+	// 它会调整时间间隔或者丢弃tick信息以适应反应慢的接收者。如果d<=0会panic。关闭该Ticker可以释放相关资源。
+	// 隔一段时间，timer会向通道中写入一个。然后select就能case到，执行里面的逻辑
+	backupTick := time.NewTicker(BgBackupInterval) // 备份
+	cleanTick := time.NewTicker(BgCleanInterval)   // 清理
 	for !bgQuit {
 		select {
 		case <-backupTick.C:
